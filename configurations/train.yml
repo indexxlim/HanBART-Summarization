@@ -15,7 +15,7 @@ setup:
   random_seed: 42
   epochs: 5
   test_mode: False  # Test Mode enables `fast_dev_run`
-  tpu_cores: 8
+  tpu_cores: 0
 
 hyperparameters:
   optimizer_class: AdamW  

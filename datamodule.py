@@ -73,6 +73,7 @@ class SequenceGenerator:
                  'attention_mask': source_batch.attention_mask,
                  'labels': target_batch.input_ids, 
                  'decoder_attention_mask': target_batch.attention_mask,
+                 'abstractive': abstractive
         }
 
 class BartDataModule(pl.LightningDataModule):
@@ -101,7 +102,7 @@ class BartDataModule(pl.LightningDataModule):
             self.test_dataset = SequenceDataset(self.valid_path)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset[:1000],
+        return DataLoader(self.train_dataset,
                           batch_size = self.batch_size,
                           shuffle=self.shuffle,
                           collate_fn=self.collate_fn,

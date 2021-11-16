@@ -1,0 +1,6 @@
+batch_size: 16
+gradient_accumulation_steps: 4
+log_every: 10
+lr: 5e-6
+lr_scheduler: exp
+optimizer_class: AdamW

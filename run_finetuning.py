@@ -12,9 +12,20 @@ from pytorch_lightning import LightningModule, Trainer, seed_everything
 import transformers
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from datamodule import BartDataModule, SequenceGenerator
+from ko_metric import Rouge
 
-
-
+rouge_evaluator = Rouge(
+    metrics=["rouge-n", "rouge-l"],
+    max_n=2,
+    limit_length=True,
+    length_limit=1000,
+    length_limit_type="words",
+    use_tokenizer=True,
+    apply_avg=True,
+    apply_best=False,
+    alpha=0.5,  # Default F1_score
+    weight_factor=1.2,
+)
 
 
 TRAIN_CONFIG_FILE = './configurations/train.yml'
@@ -32,15 +43,6 @@ def get_logger(args):
         os.mkdir(log_path)
     train_instance_log_files = os.listdir(log_path)
     train_instance_count = len(train_instance_log_files)
-
-
-    # def timetz(*args):
-    #     return datetime.now(tz).timetuple()
-
-    # tz = timezone('Asia/Seoul') # UTC, Asia/Shanghai, Europe/Berlin
-
-    # logging.Formatter.converter = timetz
-
 
     logging.basicConfig(
         filename=f'{args.checkpoint}/info/train_instance_{train_instance_count}_info.log',
@@ -74,7 +76,7 @@ def checkpoint_count(checkpoint):
 class Model(LightningModule):
     def __init__(self, model, tokenizer, **kwargs):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(kwargs)
 
         self.model = model
         self.tokenizer = tokenizer
@@ -82,8 +84,12 @@ class Model(LightningModule):
     def forward(self, **kwargs):
         return self.model(**kwargs)
 
-    def step(self, batch, batch_idx):
-        output = self(**batch)
+    def training_step(self, batch, batch_idx):
+        output = self(input_ids = batch['input_ids'],
+            attention_mask = batch['attention_mask'],
+            labels=batch['labels'],
+            decoder_attention_mask=batch['decoder_attention_mask']
+        )
 
         loss = output.loss
         logits = output.logits
@@ -94,11 +100,44 @@ class Model(LightningModule):
             #y_pred': y_pred,
         }
 
-    def training_step(self, batch, batch_idx):
-        return self.step(batch, batch_idx)
-
     def validation_step(self, batch, batch_idx):
-        return self.step(batch, batch_idx)
+        output = self(input_ids = batch['input_ids'],
+            attention_mask = batch['attention_mask'],
+            labels=batch['labels'],
+            decoder_attention_mask=batch['decoder_attention_mask']
+        )
+
+        loss = output.loss
+        logits = output.logits
+
+        repetition_penalty = 2.5
+        length_penalty=1.0
+        no_repeat_ngram_size=3
+
+        pred_ids = self.model.generate(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            max_length=200, 
+            num_beams=3,
+            repetition_penalty=repetition_penalty, 
+            length_penalty=length_penalty, 
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            early_stopping=True,
+        )
+        
+        
+        decoded_labels = [tokenizer.decode(c, 
+                          skip_special_tokens=False, 
+                          clean_up_tokenization_spaces=False) 
+                          for c in labels]
+
+        rouge_l_f1 = rouge_evaluator.get_scores(batch['abstractive'], decoded_labels)['rouge-l']['f']
+
+
+        return {
+            'loss': loss,
+            'rouge' : rouge
+        }
 
     def epoch_end(self, outputs, state='train'):
         loss = torch.tensor(0, dtype=torch.float)
@@ -107,6 +146,10 @@ class Model(LightningModule):
         loss = loss / len(outputs)
             
         self.log(state+'_loss', float(loss), on_epoch=True, prog_bar=True)
+        if state=='val':
+            rouge = rouge / len(rouge)
+            self.log(state+'_rouge', float(loss), on_epoch=True, prog_bar=True)
+            
         return {'loss': loss}
     
     def train_epoch_end(self, outputs):
@@ -143,8 +186,8 @@ class Model(LightningModule):
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 checkpoint_callback = ModelCheckpoint(
-    filename='epoch{epoch}-val_acc{val_acc:.4f}',
-    monitor='val_acc',
+    filename='epoch{epoch}-val_rouge{val_rouge:.4f}',
+    monitor='val_rouge',
     save_top_k=3,
     mode='max',
 )        
@@ -170,6 +213,7 @@ def main():
     )
 
     datamodule = BartDataModule(args.setup.train_data_path, args.setup.val_data_path, tokenizer)
+    datamodule.setup()
 
     
     model = Model(model, tokenizer, **args.hyperparameters)
@@ -182,6 +226,7 @@ def main():
         # For GPU Setup
         deterministic=torch.cuda.is_available(),
         gpus=-1 if torch.cuda.is_available() else None,
+        #accelerator="ddp" if torch.cuda.device_count() > 1 else None,
         precision=16 if args.setup.fp16 else 32,
         # For TPU Setup
         tpu_cores=args.setup.tpu_cores if args.setup.tpu_cores else None,
