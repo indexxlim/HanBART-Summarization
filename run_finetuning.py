@@ -126,29 +126,49 @@ class Model(LightningModule):
         )
         
         
-        decoded_labels = [tokenizer.decode(c, 
-                          skip_special_tokens=False, 
-                          clean_up_tokenization_spaces=False) 
-                          for c in labels]
+        decoded_pred = self.tokenizer.batch_decode(pred_ids, 
+                          skip_special_tokens=True, 
+                          clean_up_tokenization_spaces=True) 
+                          
 
-        rouge_l_f1 = rouge_evaluator.get_scores(batch['abstractive'], decoded_labels)['rouge-l']['f']
+        rouge_l_f1 = rouge_evaluator.get_scores(decoded_pred, batch['abstractive'])['rouge-l']['f']
+        rouge_l_r = rouge_evaluator.get_scores(decoded_pred, batch['abstractive'])['rouge-l']['r']
+        rouge_l_p = rouge_evaluator.get_scores(decoded_pred, batch['abstractive'])['rouge-l']['p']
 
 
         return {
             'loss': loss,
-            'rouge' : rouge
+            'rouge' : rouge_l_f1,
+            'r_recall' : rouge_l_r,
+            'r_precision' : rouge_l_p
         }
 
     def epoch_end(self, outputs, state='train'):
         loss = torch.tensor(0, dtype=torch.float)
+
+        rouge = []
+        r_recall = []
+        r_precision = []
+        
         for i in outputs:
             loss += i['loss'].cpu().detach()
+            rouge.append(i['rouge'])
+            r_recall.append(i['r_recall'])
+            r_precision.append(i['r_precision'])
+
         loss = loss / len(outputs)
             
         self.log(state+'_loss', float(loss), on_epoch=True, prog_bar=True)
         if state=='val':
-            rouge = rouge / len(rouge)
-            self.log(state+'_rouge', float(loss), on_epoch=True, prog_bar=True)
+            rouge = sum(rouge) / len(rouge)
+            r_recall = sum(r_recall) / len(r_recall)
+            r_precision = sum(r_precision) / len(r_precision)
+
+            self.log(state+'_rouge', float(rouge), on_epoch=True, prog_bar=True)
+            self.log(state+'_r_recall', float(r_recall), on_epoch=True, prog_bar=True)
+            self.log(state+'_r_precision', float(r_precision), on_epoch=True, prog_bar=True)
+
+
             
         return {'loss': loss}
     
