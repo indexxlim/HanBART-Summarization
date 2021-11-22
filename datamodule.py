@@ -52,6 +52,7 @@ class SequenceDataset(Dataset):
 class SequenceGenerator:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
+        self.pad_id = tokenizer.pad_token_id
 
     def __call__(self,batch):
         contents =  ['summarize: ' + i['contents'] for i in batch]
@@ -59,15 +60,17 @@ class SequenceGenerator:
 
         source_batch = self.tokenizer.batch_encode_plus(contents,
                                                         padding='max_length', #'max_length'
-                                                        max_length=self.tokenizer.model_max_length,
+                                                        max_length=512,
                                                         truncation=True,
                                                         return_tensors='pt')
 
         target_batch = self.tokenizer.batch_encode_plus(abstractive, 
                                                         padding='max_length', 
-                                                        max_length=self.tokenizer.model_max_length,
+                                                        max_length=512,
                                                         truncation=True, 
                                                         return_tensors='pt')
+
+        target_batch.attention_mask[target_batch.attention_mask==self.pad_id] = -100                                                        
         
         return {'input_ids': source_batch.input_ids, 
                  'attention_mask': source_batch.attention_mask,
