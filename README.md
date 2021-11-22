@@ -14,24 +14,19 @@ pytorch를 이용하여 으로 사전학습을 진행하였습니다.
 train set - 271093건
 valid set - 30122건
 
-# Tokenizer
-학습을 위해 hanbert tokenizer를 설치합니다. 현재 tokenizer는 ubuntu환경에서만 동작합니다.
-```
-$> pip install hanbert_tokenizer
-```
 
+# Tokenizer 다운로드 
 ```
->>> from hanbert_tokenizer import HanBert_Tokenizer
->>> tokenizer = HanBert_Tokenizer()
->>> tokenizer
-PreTrainedTokenizer(name_or_path='/home/jisu/Hanbert_tokenizer/hanbert_tokenizer/moran', vocab_size=53999, model_max_len=1000000000000000019884624838656, is_fast=False, padding_side='right', special_tokens={'bos_token': '[CLS]', 'eos_token': '[EOS]', 'unk_token': '[UNK]', 'sep_token': '[SEP]', 'pad_token': '[PAD]', 'cls_token': '[CLS]', 'mask_token': '[MASK]'})
->>> 
+$ wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1PTeLxreXgjobVF5zhwDKu3RNuPw3qFbY' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1PTeLxreXgjobVF5zhwDKu3RNuPw3qFbY" -O hanbert_tokenizer.tar && rm -rf /tmp/cookies.txt
+$ tar xvf hanbert_tokenizer.tar
 ```
 
 # 학습
 학습을 위한 파라미터들은 configuration/train.yml 파일에 저장되어 있습니다. 
 ```
-python run_finetuning.py
+$ python run_finetuning.py
 ```
+
+
 
 
