@@ -1,0 +1,26 @@
+setup:
+  model_id: "HanBart"
+  model_class: BartForConditionalGeneration
+  tokenizer_class: HanBertTokenizer
+  tokenizer: 
+  model: 
+  checkpoint: 
+  data_dir: ../data/
+  train_data_path: ../data2/train.tsv
+  val_data_path: ../data2/test.tsv
+  device: CPU
+  xla_parallel: True
+  fp16: False
+  random_seed: 42
+  epochs: 5
+  test_mode: False  # Test Mode enables `fast_dev_run`
+  tpu_cores: 0
+
+hyperparameters:
+  model_class: BartForConditionalGeneration
+  optimizer_class: AdamW  
+  batch_size: 16
+  gradient_accumulation_steps: 4
+  log_every: 10
+  lr: 5e-5
+  lr_scheduler: exp
